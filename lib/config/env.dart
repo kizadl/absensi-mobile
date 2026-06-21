@@ -1,10 +1,12 @@
 /// Application-wide environment configuration.
 ///
-/// For the Android emulator, the host machine is reachable at 10.0.2.2.
-/// When testing on a physical device, replace with the host LAN IP.
+/// Dev setup reaches the Laravel API on the host PC via USB:
+///   adb reverse tcp:8000 tcp:8000
+/// which maps the device's localhost:8000 to the PC's localhost:8000.
+/// (For the Android emulator without adb reverse, use http://10.0.2.2:8000/api.)
 class Env {
   Env._();
 
   /// Base URL for the Laravel API (Sanctum). Includes the `/api` prefix.
-  static const String baseUrl = 'http://10.0.2.2:8000/api';
+  static const String baseUrl = 'http://127.0.0.1:8000/api';
 }
