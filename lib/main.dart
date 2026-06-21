@@ -3,6 +3,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'config/app_theme.dart';
+import 'providers/attendance_provider.dart';
 import 'providers/auth_provider.dart';
 import 'services/api_client.dart';
 import 'screens/login_screen.dart';
@@ -26,6 +27,9 @@ class EPresensiApp extends StatelessWidget {
         Provider<ApiClient>(create: (_) => ApiClient()),
         ChangeNotifierProvider(
           create: (ctx) => AuthProvider(apiClient: ctx.read<ApiClient>()),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => AttendanceProvider(ctx.read<ApiClient>()),
         ),
       ],
       child: MaterialApp(
