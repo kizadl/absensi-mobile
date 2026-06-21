@@ -1,12 +1,10 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/annotations.dart';
-import 'package:mockito/mockito.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:epresensi/services/secure_storage_service.dart';
 
-import 'secure_storage_service_test.mocks.dart';
+class MockFlutterSecureStorage extends Mock implements FlutterSecureStorage {}
 
-@GenerateMocks([FlutterSecureStorage])
 void main() {
   const tokenKey = 'auth_token';
   late MockFlutterSecureStorage storage;
@@ -18,25 +16,26 @@ void main() {
   });
 
   test('saveToken writes the token under the auth_token key', () async {
-    when(storage.write(key: anyNamed('key'), value: anyNamed('value')))
-        .thenAnswer((_) async {});
+    when(
+      () => storage.write(key: any(named: 'key'), value: any(named: 'value')),
+    ).thenAnswer((_) async {});
 
     await service.saveToken('abc123');
 
-    verify(storage.write(key: tokenKey, value: 'abc123')).called(1);
+    verify(() => storage.write(key: tokenKey, value: 'abc123')).called(1);
   });
 
   test('readToken returns the stored token', () async {
-    when(storage.read(key: tokenKey)).thenAnswer((_) async => 'abc123');
+    when(() => storage.read(key: tokenKey)).thenAnswer((_) async => 'abc123');
 
     final result = await service.readToken();
 
     expect(result, 'abc123');
-    verify(storage.read(key: tokenKey)).called(1);
+    verify(() => storage.read(key: tokenKey)).called(1);
   });
 
   test('readToken returns null when nothing stored', () async {
-    when(storage.read(key: tokenKey)).thenAnswer((_) async => null);
+    when(() => storage.read(key: tokenKey)).thenAnswer((_) async => null);
 
     final result = await service.readToken();
 
@@ -44,10 +43,12 @@ void main() {
   });
 
   test('deleteToken removes the token key', () async {
-    when(storage.delete(key: anyNamed('key'))).thenAnswer((_) async {});
+    when(
+      () => storage.delete(key: any(named: 'key')),
+    ).thenAnswer((_) async {});
 
     await service.deleteToken();
 
-    verify(storage.delete(key: tokenKey)).called(1);
+    verify(() => storage.delete(key: tokenKey)).called(1);
   });
 }
