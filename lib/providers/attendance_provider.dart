@@ -117,20 +117,34 @@ class AttendanceProvider extends ChangeNotifier {
         path,
         data: {'lat': lat, 'lng': lng, 'address': address},
       );
+      // ApiClient.validateStatus accepts status < 500, so 422 (di luar radius /
+      // belum waktunya) and 409 (duplikat) arrive here as a normal response —
+      // Dio does NOT throw. Surface the server's friendly `message` instead of
+      // crashing on the absent `attendance` field.
+      final status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) {
+        throw AttendanceApiException(_messageFromBody(res.data));
+      }
       final map = (res.data as Map<String, dynamic>)['attendance']
           as Map<String, dynamic>;
       final model = AttendanceModel.fromJson(map);
       await loadToday(); // refresh status hari ini (loadToday clears loading itself)
       return model;
+    } on AttendanceApiException catch (e) {
+      _error = e.message;
+      _setLoading(false);
+      rethrow;
     } on DioException catch (e) {
       final msg = _messageOf(e);
       _error = msg;
       _setLoading(false);
       throw AttendanceApiException(msg);
-    } catch (e) {
-      _error = e.toString();
+    } catch (_) {
+      // Unexpected (parsing, dll.) — tetap pesan ramah, jangan tampilkan error mentah.
+      const msg = 'Presensi gagal. Coba lagi.';
+      _error = msg;
       _setLoading(false);
-      rethrow;
+      throw const AttendanceApiException(msg);
     }
   }
 
@@ -166,12 +180,14 @@ class AttendanceProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   /// Ambil pesan dari body API ({message}) bila ada, jika tidak pakai pesan Dio.
-  String _messageOf(DioException e) {
-    final data = e.response?.data;
+  String _messageOf(DioException e) => _messageFromBody(e.response?.data);
+
+  /// Ekstrak `{message}` dari body response (mis. 422/409 yang di-return Dio).
+  String _messageFromBody(dynamic data) {
     if (data is Map && data['message'] is String) {
       return data['message'] as String;
     }
-    return e.message ?? 'Terjadi kesalahan jaringan.';
+    return 'Terjadi kesalahan jaringan.';
   }
 }
 

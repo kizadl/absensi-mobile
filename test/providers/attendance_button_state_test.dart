@@ -367,6 +367,33 @@ void main() {
         expect(provider.error, isNotNull);
         expect(provider.isLoading, isFalse);
       });
+
+      test('shows the server message when 422 is RETURNED (not thrown) — e.g. di luar area kampus', () async {
+        when(
+          () => mockDio.post(
+            '/attendance/check-in',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => _fakeResponse(
+            data: {'message': 'Anda di luar area kampus (250 m).'},
+            statusCode: 422,
+          ),
+        );
+
+        await expectLater(
+          () => provider.checkIn(lat: -6.2, lng: 106.816666),
+          throwsA(
+            isA<AttendanceApiException>().having(
+              (e) => e.message,
+              'message',
+              'Anda di luar area kampus (250 m).',
+            ),
+          ),
+        );
+        expect(provider.error, 'Anda di luar area kampus (250 m).');
+        expect(provider.isLoading, isFalse);
+      });
     });
 
     // -----------------------------------------------------------------------
@@ -436,6 +463,36 @@ void main() {
           () => provider.checkOut(lat: -6.2, lng: 106.816666),
           throwsA(isA<AttendanceApiException>()),
         );
+      });
+
+      test('shows the server message when 422 is RETURNED (not thrown) — e.g. belum waktunya pulang', () async {
+        // validateStatus < 500 means Dio RETURNS the 422 response instead of
+        // throwing. The provider must surface the friendly `message`, not crash
+        // casting the (absent) `attendance` field.
+        when(
+          () => mockDio.post(
+            '/attendance/check-out',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => _fakeResponse(
+            data: {'message': 'Belum waktunya absen pulang.'},
+            statusCode: 422,
+          ),
+        );
+
+        await expectLater(
+          () => provider.checkOut(lat: -6.2, lng: 106.816666),
+          throwsA(
+            isA<AttendanceApiException>().having(
+              (e) => e.message,
+              'message',
+              'Belum waktunya absen pulang.',
+            ),
+          ),
+        );
+        expect(provider.error, 'Belum waktunya absen pulang.');
+        expect(provider.isLoading, isFalse);
       });
     });
 
