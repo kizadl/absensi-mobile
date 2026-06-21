@@ -7,7 +7,8 @@ import '../providers/attendance_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/location_service.dart';
 
-/// Tombol pintar terisolasi — label & enable bergantung pada [state].
+/// Tombol pintar terisolasi — label & enable bergantung pada [state],
+/// [windowAllowed] (flag server), dan [windowStartTime] (jam mulai dari setting).
 /// Dipisah agar bisa diuji tanpa provider.
 class SmartActionButton extends StatelessWidget {
   const SmartActionButton({
@@ -15,25 +16,39 @@ class SmartActionButton extends StatelessWidget {
     required this.state,
     required this.loading,
     required this.onPressed,
+    required this.windowAllowed,
+    this.windowStartTime,
   });
 
   final AttendanceButtonState state;
   final bool loading;
   final VoidCallback? onPressed;
 
-  static String labelFor(AttendanceButtonState s) {
-    switch (s) {
+  /// true = server mengizinkan aksi sekarang (can_check_in / can_check_out).
+  final bool windowAllowed;
+
+  /// Jam mulai window ("HH:MM") dari SettingModel; null jika lokasi belum dimuat.
+  final String? windowStartTime;
+
+  String _label() {
+    switch (state) {
       case AttendanceButtonState.canCheckIn:
-        return 'Catat Masuk';
+        if (windowAllowed) return 'Catat Masuk';
+        return windowStartTime != null
+            ? 'Masuk mulai $windowStartTime'
+            : 'Belum waktunya masuk';
       case AttendanceButtonState.canCheckOut:
-        return 'Catat Pulang';
+        if (windowAllowed) return 'Catat Pulang';
+        return windowStartTime != null
+            ? 'Pulang mulai $windowStartTime'
+            : 'Belum waktunya pulang';
       case AttendanceButtonState.done:
         return 'Presensi hari ini selesai';
     }
   }
 
-  static IconData iconFor(AttendanceButtonState s) {
-    switch (s) {
+  IconData _icon() {
+    switch (state) {
       case AttendanceButtonState.canCheckIn:
         return Icons.login;
       case AttendanceButtonState.canCheckOut:
@@ -43,14 +58,17 @@ class SmartActionButton extends StatelessWidget {
     }
   }
 
+  /// Tombol aktif hanya jika: bukan done, bukan loading, dan server mengizinkan.
+  bool get _isEnabled =>
+      state != AttendanceButtonState.done && !loading && windowAllowed;
+
   @override
   Widget build(BuildContext context) {
-    final isDone = state == AttendanceButtonState.done;
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: (isDone || loading) ? null : onPressed,
+        onPressed: _isEnabled ? onPressed : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF2563EB),
           foregroundColor: Colors.white,
@@ -73,9 +91,9 @@ class SmartActionButton extends StatelessWidget {
                     strokeWidth: 2, color: Colors.white),
               )
             else
-              Icon(iconFor(state)),
+              Icon(_icon()),
             const SizedBox(width: 8),
-            Text(labelFor(state)),
+            Text(_label()),
           ],
         ),
       ),
@@ -219,6 +237,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         state: attendance.buttonState,
                         loading: attendance.isLoading,
                         onPressed: _runPunchFlow,
+                        windowAllowed: attendance.buttonState ==
+                                AttendanceButtonState.canCheckIn
+                            ? attendance.canCheckIn
+                            : attendance.canCheckOut,
+                        windowStartTime: attendance.buttonState ==
+                                AttendanceButtonState.canCheckIn
+                            ? auth.location?.checkInStart
+                            : auth.location?.checkOutStart,
                       ),
                     ],
                   ),

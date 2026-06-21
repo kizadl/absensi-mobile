@@ -10,7 +10,7 @@ import 'package:epresensi/providers/auth_provider.dart';
 import 'package:epresensi/screens/home_screen.dart';
 import 'package:epresensi/services/api_client.dart';
 
-/// AuthProvider stub: user tetap + loadLocation/no-op (tanpa HTTP).
+/// AuthProvider stub: user tetap + loadLocation no-op (tanpa HTTP).
 class FakeAuthProvider extends AuthProvider {
   FakeAuthProvider({UserModel? user, SettingModel? location})
       : _fakeUser = user,
@@ -30,20 +30,28 @@ class FakeAuthProvider extends AuthProvider {
   Future<void> loadLocation() async {} // no-op: lokasi sudah di-set
 }
 
-/// AttendanceProvider stub: state tombol bisa diatur; loadToday no-op.
+/// AttendanceProvider stub: state tombol & flag window bisa diatur; loadToday no-op.
 class FakeAttendanceProvider extends AttendanceProvider {
   FakeAttendanceProvider({
     this.fakeHasCheckIn = false,
     this.fakeHasCheckOut = false,
+    this.fakeCanCheckIn = true,
+    this.fakeCanCheckOut = true,
   }) : super(ApiClient());
 
   final bool fakeHasCheckIn;
   final bool fakeHasCheckOut;
+  final bool fakeCanCheckIn;
+  final bool fakeCanCheckOut;
 
   @override
   bool get hasCheckIn => fakeHasCheckIn;
   @override
   bool get hasCheckOut => fakeHasCheckOut;
+  @override
+  bool get canCheckIn => fakeCanCheckIn;
+  @override
+  bool get canCheckOut => fakeCanCheckOut;
   @override
   bool get isLoading => false;
   @override
@@ -103,24 +111,67 @@ void main() {
       attendance: FakeAttendanceProvider(
         fakeHasCheckIn: false,
         fakeHasCheckOut: false,
+        fakeCanCheckIn: true,
       ),
     ));
     await tester.pump(); // selesaikan post-frame callback
 
     expect(find.text('Adit Saputra'), findsOneWidget);
     expect(find.text('Catat Masuk'), findsOneWidget);
+    final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+    expect(btn.onPressed, isNotNull); // enabled
   });
 
-  testWidgets('label "Catat Pulang" saat sudah check-in', (tester) async {
+  testWidgets('label "Catat Pulang" saat sudah check-in dan window terbuka',
+      (tester) async {
     await tester.pumpWidget(_wrap(
       auth: FakeAuthProvider(user: user, location: setting),
       attendance: FakeAttendanceProvider(
         fakeHasCheckIn: true,
         fakeHasCheckOut: false,
+        fakeCanCheckOut: true,
       ),
     ));
     await tester.pump();
 
     expect(find.text('Catat Pulang'), findsOneWidget);
+    final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+    expect(btn.onPressed, isNotNull); // enabled
+  });
+
+  testWidgets(
+      'canCheckIn + canCheckIn==false → "Masuk mulai 07:00" dan disabled',
+      (tester) async {
+    await tester.pumpWidget(_wrap(
+      auth: FakeAuthProvider(user: user, location: setting),
+      attendance: FakeAttendanceProvider(
+        fakeHasCheckIn: false,
+        fakeHasCheckOut: false,
+        fakeCanCheckIn: false,
+      ),
+    ));
+    await tester.pump();
+
+    expect(find.text('Masuk mulai 07:00'), findsOneWidget);
+    final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+    expect(btn.onPressed, isNull); // disabled
+  });
+
+  testWidgets(
+      'canCheckOut + canCheckOut==false → "Pulang mulai 15:00" dan disabled',
+      (tester) async {
+    await tester.pumpWidget(_wrap(
+      auth: FakeAuthProvider(user: user, location: setting),
+      attendance: FakeAttendanceProvider(
+        fakeHasCheckIn: true,
+        fakeHasCheckOut: false,
+        fakeCanCheckOut: false,
+      ),
+    ));
+    await tester.pump();
+
+    expect(find.text('Pulang mulai 15:00'), findsOneWidget);
+    final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+    expect(btn.onPressed, isNull); // disabled
   });
 }
