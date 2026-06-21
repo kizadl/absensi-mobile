@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'config/app_theme.dart';
@@ -7,7 +8,9 @@ import 'services/api_client.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_scaffold.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('id_ID', null);
   runApp(const EPresensiApp());
 }
 
