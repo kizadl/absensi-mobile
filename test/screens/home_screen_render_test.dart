@@ -1,174 +1,118 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 
-import 'package:epresensi/models/setting_model.dart';
-import 'package:epresensi/models/user_model.dart';
-import 'package:epresensi/providers/attendance_provider.dart';
-import 'package:epresensi/providers/auth_provider.dart';
+import 'package:epresensi/models/course_model.dart';
+import 'package:epresensi/providers/course_provider.dart';
 import 'package:epresensi/screens/home_screen.dart';
-import 'package:epresensi/services/api_client.dart';
 
-/// AuthProvider stub: user tetap + loadLocation no-op (tanpa HTTP).
-class FakeAuthProvider extends AuthProvider {
-  FakeAuthProvider({UserModel? user, SettingModel? location})
-      : _fakeUser = user,
-        _fakeLocation = location,
-        super(apiClient: ApiClient());
+class MockCourseProvider extends Mock implements CourseProvider {}
 
-  final UserModel? _fakeUser;
-  final SettingModel? _fakeLocation;
+CourseModel _course({
+  required int id,
+  required String name,
+  required String code,
+  required String lecturer,
+  Map<String, dynamic>? today,
+}) =>
+    CourseModel.fromJson({
+      'id': id,
+      'name': name,
+      'code': code,
+      'lecturer': lecturer,
+      'check_in_start': '07:00',
+      'late_after': '07:15',
+      'check_out_start': '15:00',
+      'today': ?today,
+    });
 
-  @override
-  UserModel? get user => _fakeUser;
-
-  @override
-  SettingModel? get location => _fakeLocation;
-
-  @override
-  Future<void> loadLocation() async {} // no-op: lokasi sudah di-set
-}
-
-/// AttendanceProvider stub: state tombol & flag window bisa diatur; loadToday no-op.
-class FakeAttendanceProvider extends AttendanceProvider {
-  FakeAttendanceProvider({
-    this.fakeHasCheckIn = false,
-    this.fakeHasCheckOut = false,
-    this.fakeCanCheckIn = true,
-    this.fakeCanCheckOut = true,
-  }) : super(ApiClient());
-
-  final bool fakeHasCheckIn;
-  final bool fakeHasCheckOut;
-  final bool fakeCanCheckIn;
-  final bool fakeCanCheckOut;
-
-  @override
-  bool get hasCheckIn => fakeHasCheckIn;
-  @override
-  bool get hasCheckOut => fakeHasCheckOut;
-  @override
-  bool get canCheckIn => fakeCanCheckIn;
-  @override
-  bool get canCheckOut => fakeCanCheckOut;
-  @override
-  bool get isLoading => false;
-  @override
-  String? get error => null;
-  // buttonState menggunakan private field _hasCheckIn/_hasCheckOut, bukan getter,
-  // jadi override langsung di sini agar stub bekerja benar.
-  @override
-  AttendanceButtonState get buttonState => deriveButtonState(
-        hasCheckIn: fakeHasCheckIn,
-        hasCheckOut: fakeHasCheckOut,
-      );
-  @override
-  Future<void> loadToday(int courseId) async {} // no-op: tanpa HTTP
-}
-
-Widget _wrap({
-  required FakeAuthProvider auth,
-  required FakeAttendanceProvider attendance,
-}) {
-  return MultiProvider(
-    providers: [
-      ChangeNotifierProvider<AuthProvider>.value(value: auth),
-      ChangeNotifierProvider<AttendanceProvider>.value(value: attendance),
-    ],
-    child: const MaterialApp(home: HomeScreen()),
-  );
-}
+Widget _wrap(MockCourseProvider provider) =>
+    ChangeNotifierProvider<CourseProvider>.value(
+      value: provider,
+      child: const MaterialApp(home: HomeScreen()),
+    );
 
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('id_ID', null);
   });
 
-  const user = UserModel(
-    id: 7,
-    role: 'mahasiswa',
-    name: 'Adit Saputra',
-    username: 'adit',
-    email: 'adit@example.com',
-  );
+  late MockCourseProvider provider;
 
-  const setting = SettingModel(
-    campusName: 'Kampus A',
-    campusLat: -6.2,
-    campusLng: 106.8,
-    radiusMeters: 100,
-    timezone: 'Asia/Jakarta',
-  );
-
-  testWidgets('menampilkan nama sapaan & label "Catat Masuk" saat canCheckIn',
-      (tester) async {
-    await tester.pumpWidget(_wrap(
-      auth: FakeAuthProvider(user: user, location: setting),
-      attendance: FakeAttendanceProvider(
-        fakeHasCheckIn: false,
-        fakeHasCheckOut: false,
-        fakeCanCheckIn: true,
-      ),
-    ));
-    await tester.pump(); // selesaikan post-frame callback
-
-    expect(find.text('Adit Saputra'), findsOneWidget);
-    expect(find.text('Catat Masuk'), findsOneWidget);
-    final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
-    expect(btn.onPressed, isNotNull); // enabled
+  setUp(() {
+    provider = MockCourseProvider();
+    when(() => provider.isLoading).thenReturn(false);
+    when(() => provider.error).thenReturn(null);
+    when(() => provider.courses).thenReturn(const []);
+    when(() => provider.loadCourses()).thenAnswer((_) async {});
+    when(() => provider.addListener(any())).thenReturn(null);
+    when(() => provider.removeListener(any())).thenReturn(null);
   });
 
-  testWidgets('label "Catat Pulang" saat sudah check-in dan window terbuka',
+  testWidgets('renders a card per course with name, code, lecturer',
       (tester) async {
-    await tester.pumpWidget(_wrap(
-      auth: FakeAuthProvider(user: user, location: setting),
-      attendance: FakeAttendanceProvider(
-        fakeHasCheckIn: true,
-        fakeHasCheckOut: false,
-        fakeCanCheckOut: true,
-      ),
-    ));
+    when(() => provider.courses).thenReturn([
+      _course(id: 1, name: 'Pemrograman Web', code: 'IF301', lecturer: 'Dr. Budi'),
+      _course(id: 2, name: 'Basis Data', code: 'IF302', lecturer: 'Dr. Sari'),
+    ]);
+
+    await tester.pumpWidget(_wrap(provider));
     await tester.pump();
 
-    expect(find.text('Catat Pulang'), findsOneWidget);
-    final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
-    expect(btn.onPressed, isNotNull); // enabled
+    expect(find.text('Pemrograman Web'), findsOneWidget);
+    expect(find.text('Basis Data'), findsOneWidget);
+    expect(find.text('IF301'), findsOneWidget);
+    expect(find.text('Dr. Sari'), findsOneWidget);
   });
 
-  testWidgets(
-      'canCheckIn + canCheckIn==false → "Belum waktunya masuk" dan disabled (jam from course in Task 5)',
-      (tester) async {
-    await tester.pumpWidget(_wrap(
-      auth: FakeAuthProvider(user: user, location: setting),
-      attendance: FakeAttendanceProvider(
-        fakeHasCheckIn: false,
-        fakeHasCheckOut: false,
-        fakeCanCheckIn: false,
+  testWidgets('renders the today status badge per card', (tester) async {
+    when(() => provider.courses).thenReturn([
+      _course(
+        id: 1,
+        name: 'Pemrograman Web',
+        code: 'IF301',
+        lecturer: 'Dr. Budi',
+        today: const {
+          'has_check_in': true,
+          'has_check_out': false,
+          'can_check_in': false,
+          'can_check_out': true,
+          'attendance': {
+            'id': 1,
+            'date': '2026-06-22',
+            'check_in_at': '2026-06-22 07:20:00',
+            'check_in_status': 'terlambat',
+          },
+        },
       ),
-    ));
+      _course(id: 2, name: 'Basis Data', code: 'IF302', lecturer: 'Dr. Sari'),
+    ]);
+
+    await tester.pumpWidget(_wrap(provider));
     await tester.pump();
 
-    expect(find.text('Belum waktunya masuk'), findsOneWidget);
-    final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
-    expect(btn.onPressed, isNull); // disabled
+    expect(find.text('Terlambat'), findsOneWidget);
+    expect(find.text('Belum absen'), findsOneWidget);
   });
 
-  testWidgets(
-      'canCheckOut + canCheckOut==false → "Belum waktunya pulang" dan disabled (jam from course in Task 5)',
-      (tester) async {
-    await tester.pumpWidget(_wrap(
-      auth: FakeAuthProvider(user: user, location: setting),
-      attendance: FakeAttendanceProvider(
-        fakeHasCheckIn: true,
-        fakeHasCheckOut: false,
-        fakeCanCheckOut: false,
-      ),
-    ));
+  testWidgets('empty courses shows empty message', (tester) async {
+    await tester.pumpWidget(_wrap(provider));
     await tester.pump();
+    expect(find.text('Belum ada mata kuliah.'), findsOneWidget);
+  });
 
-    expect(find.text('Belum waktunya pulang'), findsOneWidget);
-    final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
-    expect(btn.onPressed, isNull); // disabled
+  testWidgets('error shows message + retry', (tester) async {
+    when(() => provider.error).thenReturn('Gagal memuat daftar mata kuliah.');
+    await tester.pumpWidget(_wrap(provider));
+    await tester.pump();
+    expect(find.text('Gagal memuat daftar mata kuliah.'), findsOneWidget);
+  });
+
+  testWidgets('calls loadCourses on init', (tester) async {
+    await tester.pumpWidget(_wrap(provider));
+    await tester.pump();
+    verify(() => provider.loadCourses()).called(1);
   });
 }

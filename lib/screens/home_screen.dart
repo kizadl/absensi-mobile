@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../models/setting_model.dart';
+import '../models/course_model.dart';
 import '../providers/attendance_provider.dart';
-import '../providers/auth_provider.dart';
-import '../services/location_service.dart';
+import '../providers/course_provider.dart';
+import 'course_presensi_screen.dart';
 
 /// Tombol pintar terisolasi — label & enable bergantung pada [state],
 /// [windowAllowed] (flag server), dan [windowStartTime] (jam mulai dari setting).
@@ -109,254 +108,193 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final LocationService _location = LocationService();
-  late final Stream<DateTime> _clock;
-
   @override
   void initState() {
     super.initState();
-    _clock = Stream<DateTime>.periodic(
-        const Duration(seconds: 1), (_) => DateTime.now());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<AuthProvider>();
-      context.read<AttendanceProvider>().loadToday();
-      auth.loadLocation();
+      context.read<CourseProvider>().loadCourses();
     });
   }
 
-  Future<void> _runPunchFlow() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final attendance = context.read<AttendanceProvider>();
-    final auth = context.read<AuthProvider>();
-    final SettingModel? setting = auth.location;
+  Future<void> _refresh() => context.read<CourseProvider>().loadCourses();
 
-    if (setting == null) {
-      messenger.showSnackBar(const SnackBar(
-          content: Text('Data lokasi kampus belum dimuat. Coba lagi.')));
-      return;
-    }
-
-    try {
-      final pos = await _location.getCurrentPosition();
-      final distance = _location.distanceMeters(
-        pos.latitude,
-        pos.longitude,
-        setting.campusLat,
-        setting.campusLng,
-      );
-
-      if (distance > setting.radiusMeters) {
-        messenger.showSnackBar(SnackBar(
-          backgroundColor: Colors.red.shade600,
-          content: Text('Anda di luar area kampus (${distance.round()} m)'),
-        ));
-        return;
-      }
-
-      // Dalam radius → reverse-geocode alamat untuk dikirim ke server
-      // (disimpan sebagai check_in_address / check_out_address).
-      final address =
-          await _location.addressFromLatLng(pos.latitude, pos.longitude);
-
-      final state = attendance.buttonState;
-      if (state == AttendanceButtonState.canCheckIn) {
-        await attendance.checkIn(
-            lat: pos.latitude, lng: pos.longitude, address: address);
-        messenger.showSnackBar(const SnackBar(
-            backgroundColor: Color(0xFF16A34A),
-            content: Text('Presensi masuk tercatat.')));
-      } else if (state == AttendanceButtonState.canCheckOut) {
-        await attendance.checkOut(
-            lat: pos.latitude, lng: pos.longitude, address: address);
-        messenger.showSnackBar(const SnackBar(
-            backgroundColor: Color(0xFF16A34A),
-            content: Text('Presensi pulang tercatat.')));
-      }
-    } on LocationException catch (e) {
-      messenger.showSnackBar(SnackBar(
-          backgroundColor: Colors.red.shade600, content: Text(e.message)));
-    } on AttendanceApiException catch (e) {
-      messenger.showSnackBar(SnackBar(
-          backgroundColor: Colors.red.shade600, content: Text(e.message)));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(
-          backgroundColor: Colors.red.shade600,
-          content: Text('Gagal: $e')));
-    }
+  void _openCourse(CourseModel course) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CoursePresensiScreen(course: course),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final attendance = context.watch<AttendanceProvider>();
-    final name = auth.user?.name ?? 'Mahasiswa';
+    final provider = context.watch<CourseProvider>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _BlueHeader(name: name, clock: _clock),
-            const SizedBox(height: 24),
-            // Affordance "coba lagi" saat setting lokasi gagal dimuat atau
-            // status presensi hari ini gagal di-load.
-            if (auth.location == null || attendance.error != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                child: _InlineError(
-                  message: attendance.error ??
-                      'Data lokasi kampus belum dimuat.',
-                  onRetry: () {
-                    if (auth.location == null) auth.loadLocation();
-                    if (attendance.error != null) attendance.loadToday();
-                  },
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Card(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18)),
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Presensi Hari Ini',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      Text(
-                        _statusText(attendance),
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                      const SizedBox(height: 18),
-                      SmartActionButton(
-                        state: attendance.buttonState,
-                        loading: attendance.isLoading,
-                        onPressed: _runPunchFlow,
-                        windowAllowed: attendance.buttonState ==
-                                AttendanceButtonState.canCheckIn
-                            ? attendance.canCheckIn
-                            : attendance.canCheckOut,
-                        // TODO(Task 5): use course jam instead of SettingModel jam (jam now per-course)
-                        windowStartTime: null,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF2563EB),
+        foregroundColor: Colors.white,
+        title: const Text('Mata Kuliah'),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: Builder(
+          builder: (context) {
+            if (provider.isLoading && provider.courses.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (provider.error != null && provider.courses.isEmpty) {
+              return _CenterMessage(
+                text: provider.error!,
+                onRetry: _refresh,
+              );
+            }
+            if (provider.courses.isEmpty) {
+              return const _CenterMessage(text: 'Belum ada mata kuliah.');
+            }
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: provider.courses.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (_, i) {
+                final c = provider.courses[i];
+                return _CourseCard(
+                  course: c,
+                  onTap: () => _openCourse(c),
+                );
+              },
+            );
+          },
         ),
       ),
     );
   }
-
-  String _statusText(AttendanceProvider a) {
-    switch (a.buttonState) {
-      case AttendanceButtonState.canCheckIn:
-        return 'Anda belum melakukan presensi masuk.';
-      case AttendanceButtonState.canCheckOut:
-        return 'Sudah masuk. Jangan lupa catat pulang.';
-      case AttendanceButtonState.done:
-        return 'Presensi masuk & pulang sudah tercatat.';
-    }
-  }
 }
 
-class _BlueHeader extends StatelessWidget {
-  const _BlueHeader({required this.name, required this.clock});
+class _CourseCard extends StatelessWidget {
+  const _CourseCard({required this.course, required this.onTap});
 
-  final String name;
-  final Stream<DateTime> clock;
+  final CourseModel course;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-      decoration: const BoxDecoration(
-        color: Color(0xFF2563EB),
-        borderRadius:
-            BorderRadius.vertical(bottom: Radius.circular(28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Selamat datang,',
-              style: TextStyle(color: Colors.white70, fontSize: 14)),
-          const SizedBox(height: 4),
-          Text(name,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          StreamBuilder<DateTime>(
-            stream: clock,
-            builder: (context, snapshot) {
-              final now = snapshot.data ?? DateTime.now();
-              final jam = DateFormat('HH:mm:ss', 'id_ID').format(now);
-              final tanggal =
-                  DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(now);
-              return Column(
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(jam,
+                  Expanded(
+                    child: Text(
+                      course.name,
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 40,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 2)),
-                  const SizedBox(height: 4),
-                  Text(tanggal,
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 14)),
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  _CourseStatusBadge(label: course.statusLabel),
                 ],
-              );
-            },
+              ),
+              const SizedBox(height: 6),
+              Text(
+                course.code,
+                style: const TextStyle(
+                    color: Color(0xFF2563EB), fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                course.lecturer,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-/// Bagian error inline dengan tombol "Coba lagi" — tampil saat setting lokasi
-/// gagal dimuat atau status presensi hari ini gagal di-load.
-class _InlineError extends StatelessWidget {
-  const _InlineError({required this.message, required this.onRetry});
+/// Badge untuk home card: Belum absen / Hadir / Terlambat / Selesai.
+class _CourseStatusBadge extends StatelessWidget {
+  const _CourseStatusBadge({required this.label});
 
-  final String message;
-  final VoidCallback onRetry;
+  final String label;
+
+  Color get _color {
+    switch (label) {
+      case 'Hadir':
+        return const Color(0xFF16A34A);
+      case 'Terlambat':
+        return const Color(0xFFDC2626);
+      case 'Selesai':
+        return const Color(0xFF2563EB);
+      default: // Belum absen
+        return Colors.grey;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEE2E2),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFCA5A5)),
+        color: _color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: Color(0xFFB91C1C), size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(message,
-                style: const TextStyle(color: Color(0xFFB91C1C))),
-          ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text('Coba lagi',
-                style: TextStyle(
-                    color: Color(0xFFB91C1C), fontWeight: FontWeight.w600)),
-          ),
-        ],
+      child: Text(
+        label,
+        style: TextStyle(
+          color: _color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
+    );
+  }
+}
+
+class _CenterMessage extends StatelessWidget {
+  const _CenterMessage({required this.text, this.onRetry});
+
+  final String text;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      children: [
+        const SizedBox(height: 140),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Text(
+                  text,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+                if (onRetry != null) ...[
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: onRetry,
+                    child: const Text('Coba lagi'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
