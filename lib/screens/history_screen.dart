@@ -123,6 +123,14 @@ class _HistoryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (item.course != null) ...[
+              Text(
+                item.course!.name,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+              ),
+              const SizedBox(height: 4),
+            ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

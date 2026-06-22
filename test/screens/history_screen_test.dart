@@ -31,6 +31,7 @@ AttendanceModel _makeRecord({
   DateTime? checkInAt,
   String? checkInStatus,
   DateTime? checkOutAt,
+  AttendanceCourse? course,
 }) {
   return AttendanceModel(
     id: id,
@@ -38,6 +39,7 @@ AttendanceModel _makeRecord({
     checkInAt: checkInAt,
     checkInStatus: checkInStatus,
     checkOutAt: checkOutAt,
+    course: course,
   );
 }
 
@@ -163,6 +165,25 @@ void main() {
       await tester.pump();
 
       verify(() => mockProvider.loadHistory(any())).called(1);
+    });
+
+    testWidgets('merender nama matkul per baris', (tester) async {
+      final records = [
+        _makeRecord(
+          id: 1,
+          date: DateTime(2025, 6, 10),
+          checkInAt: DateTime(2025, 6, 10, 8, 30),
+          checkInStatus: 'tepat_waktu',
+          course: const AttendanceCourse(
+              id: 3, name: 'Basis Data', code: 'IF302'),
+        ),
+      ];
+      when(() => mockProvider.history).thenReturn(records);
+
+      await tester.pumpWidget(_wrap(mockProvider));
+      await tester.pump();
+
+      expect(find.text('Basis Data'), findsOneWidget);
     });
   });
 }
