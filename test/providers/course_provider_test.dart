@@ -120,5 +120,18 @@ void main() {
       expect(provider.courses, isEmpty);
       expect(provider.isLoading, isFalse);
     });
+
+    test('statusCode 401 RETURNED (not thrown) extracts message and sets error', () async {
+      // validateStatus < 500 means Dio RETURNS the response instead of throwing.
+      when(() => dio.get('/courses')).thenAnswer(
+        (_) async => _res({'message': 'Unauthenticated.'}, statusCode: 401),
+      );
+
+      await provider.loadCourses();
+
+      expect(provider.error, equals('Unauthenticated.'));
+      expect(provider.courses, isEmpty);
+      expect(provider.isLoading, isFalse);
+    });
   });
 }

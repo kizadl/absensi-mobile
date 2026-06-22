@@ -285,6 +285,21 @@ void main() {
         expect(loadingDuringCall, isTrue);
         expect(provider.isLoading, isFalse);
       });
+
+      test('statusCode 401 RETURNED (not thrown) extracts message and sets error', () async {
+        // validateStatus < 500 means Dio RETURNS the response instead of throwing.
+        when(() => mockDio.get('/courses/5/today')).thenAnswer(
+          (_) async => _fakeResponse(
+            data: {'message': 'Unauthenticated.'},
+            statusCode: 401,
+          ),
+        );
+
+        await provider.loadToday(5);
+
+        expect(provider.error, equals('Unauthenticated.'));
+        expect(provider.isLoading, isFalse);
+      });
     });
 
     // -----------------------------------------------------------------------

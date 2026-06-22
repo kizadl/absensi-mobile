@@ -62,6 +62,11 @@ class AttendanceProvider extends ChangeNotifier {
     _error = null;
     try {
       final res = await _api.dio.get('/courses/$courseId/today');
+      final status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) {
+        _error = _messageFromBody(res.data);
+        return;
+      }
       // Response is the flat course+today shape: {...course, today:{...}}.
       final body = res.data as Map<String, dynamic>;
       final data = (body['today'] as Map).cast<String, dynamic>();
@@ -180,6 +185,12 @@ class AttendanceProvider extends ChangeNotifier {
           'course_id': courseId,
         }..removeWhere((_, v) => v == null),
       );
+      final status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) {
+        _error = _messageFromBody(res.data);
+        _history = const [];
+        return;
+      }
       final list = (res.data as Map<String, dynamic>)['data'] as List<dynamic>;
       _history = list
           .map((e) => AttendanceModel.fromJson(e as Map<String, dynamic>))

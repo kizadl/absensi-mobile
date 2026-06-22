@@ -25,6 +25,12 @@ class CourseProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final res = await _api.dio.get('/courses');
+      final status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) {
+        _error = _messageFromBody(res.data);
+        _courses = const [];
+        return;
+      }
       final list = (res.data as Map<String, dynamic>)['data'] as List<dynamic>;
       _courses = list
           .map((e) => CourseModel.fromJson((e as Map).cast<String, dynamic>()))
@@ -46,5 +52,10 @@ class CourseProvider extends ChangeNotifier {
       return data['message'] as String;
     }
     return 'Gagal memuat daftar mata kuliah.';
+  }
+
+  String _messageFromBody(dynamic data) {
+    if (data is Map && data['message'] is String) return data['message'] as String;
+    return 'Terjadi kesalahan jaringan.';
   }
 }
