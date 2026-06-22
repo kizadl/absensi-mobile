@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'config/app_theme.dart';
 import 'providers/attendance_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/course_provider.dart';
 import 'services/api_client.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_scaffold.dart';
@@ -30,6 +31,9 @@ class EPresensiApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (ctx) => AttendanceProvider(ctx.read<ApiClient>()),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => CourseProvider(ctx.read<ApiClient>()),
         ),
       ],
       child: MaterialApp(
