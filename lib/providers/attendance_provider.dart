@@ -54,15 +54,17 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
-  // loadToday — GET /attendance/today
+  // loadToday — GET /courses/{courseId}/today
   // ---------------------------------------------------------------------------
 
-  Future<void> loadToday() async {
+  Future<void> loadToday(int courseId) async {
     _setLoading(true);
     _error = null;
     try {
-      final res = await _api.dio.get('/attendance/today');
-      final data = res.data as Map<String, dynamic>;
+      final res = await _api.dio.get('/courses/$courseId/today');
+      // Response is the flat course+today shape: {...course, today:{...}}.
+      final body = res.data as Map<String, dynamic>;
+      final data = (body['today'] as Map).cast<String, dynamic>();
       _hasCheckIn = data['has_check_in'] == true;
       _hasCheckOut = data['has_check_out'] == true;
       _canCheckIn = data['can_check_in'] == true;
@@ -81,31 +83,46 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
-  // checkIn — POST /attendance/check-in
+  // checkIn — POST /courses/{courseId}/check-in
   // ---------------------------------------------------------------------------
 
   Future<AttendanceModel> checkIn({
+    required int courseId,
     required double lat,
     required double lng,
     String? address,
   }) {
-    return _doPunch('/attendance/check-in', lat: lat, lng: lng, address: address);
+    return _doPunch(
+      '/courses/$courseId/check-in',
+      courseId: courseId,
+      lat: lat,
+      lng: lng,
+      address: address,
+    );
   }
 
   // ---------------------------------------------------------------------------
-  // checkOut — POST /attendance/check-out
+  // checkOut — POST /courses/{courseId}/check-out
   // ---------------------------------------------------------------------------
 
   Future<AttendanceModel> checkOut({
+    required int courseId,
     required double lat,
     required double lng,
     String? address,
   }) {
-    return _doPunch('/attendance/check-out', lat: lat, lng: lng, address: address);
+    return _doPunch(
+      '/courses/$courseId/check-out',
+      courseId: courseId,
+      lat: lat,
+      lng: lng,
+      address: address,
+    );
   }
 
   Future<AttendanceModel> _doPunch(
     String path, {
+    required int courseId,
     required double lat,
     required double lng,
     String? address,
@@ -128,7 +145,7 @@ class AttendanceProvider extends ChangeNotifier {
       final map = (res.data as Map<String, dynamic>)['attendance']
           as Map<String, dynamic>;
       final model = AttendanceModel.fromJson(map);
-      await loadToday(); // refresh status hari ini (loadToday clears loading itself)
+      await loadToday(courseId); // refresh status matkul (loadToday clears loading itself)
       return model;
     } on AttendanceApiException catch (e) {
       _error = e.message;
@@ -149,16 +166,19 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
-  // loadHistory — GET /attendance/history?month=YYYY-MM
+  // loadHistory — GET /attendance/history?month=YYYY-MM[&course_id=N]
   // ---------------------------------------------------------------------------
 
-  Future<void> loadHistory(String month) async {
+  Future<void> loadHistory(String month, {int? courseId}) async {
     _setLoading(true);
     _error = null;
     try {
       final res = await _api.dio.get(
         '/attendance/history',
-        queryParameters: {'month': month},
+        queryParameters: {
+          'month': month,
+          'course_id': courseId,
+        }..removeWhere((_, v) => v == null),
       );
       final list = (res.data as Map<String, dynamic>)['data'] as List<dynamic>;
       _history = list

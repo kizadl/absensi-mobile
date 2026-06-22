@@ -64,7 +64,7 @@ class FakeAttendanceProvider extends AttendanceProvider {
         hasCheckOut: fakeHasCheckOut,
       );
   @override
-  Future<void> loadToday() async {} // no-op: tanpa HTTP
+  Future<void> loadToday(int courseId) async {} // no-op: tanpa HTTP
 }
 
 Widget _wrap({

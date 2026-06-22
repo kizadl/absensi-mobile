@@ -29,6 +29,19 @@ Response<dynamic> _fakeResponse({
   );
 }
 
+/// Wraps a today fixture inside the flat course+today shape returned by
+/// GET /courses/{id}/today.
+Map<String, dynamic> _wrapToday(Map<String, dynamic> today) => {
+      'id': 5,
+      'name': 'Pemrograman Web',
+      'code': 'IF301',
+      'lecturer': 'Dr. Budi',
+      'check_in_start': '07:00',
+      'late_after': '07:15',
+      'check_out_start': '15:00',
+      'today': today,
+    };
+
 /// Today fixture — belum check-in sama sekali.
 const Map<String, dynamic> _todayCanCheckIn = {
   'has_check_in': false,
@@ -200,10 +213,10 @@ void main() {
 
     group('loadToday', () {
       test('belum check-in: sets hasCheckIn=false, buttonState=canCheckIn', () async {
-        when(() => mockDio.get('/attendance/today'))
-            .thenAnswer((_) async => _fakeResponse(data: _todayCanCheckIn));
+        when(() => mockDio.get('/courses/5/today'))
+            .thenAnswer((_) async => _fakeResponse(data: _wrapToday(_todayCanCheckIn)));
 
-        await provider.loadToday();
+        await provider.loadToday(5);
 
         expect(provider.hasCheckIn, isFalse);
         expect(provider.hasCheckOut, isFalse);
@@ -216,10 +229,10 @@ void main() {
       });
 
       test('sudah check-in: sets buttonState=canCheckOut, today non-null', () async {
-        when(() => mockDio.get('/attendance/today'))
-            .thenAnswer((_) async => _fakeResponse(data: _todayCanCheckOut));
+        when(() => mockDio.get('/courses/5/today'))
+            .thenAnswer((_) async => _fakeResponse(data: _wrapToday(_todayCanCheckOut)));
 
-        await provider.loadToday();
+        await provider.loadToday(5);
 
         expect(provider.hasCheckIn, isTrue);
         expect(provider.hasCheckOut, isFalse);
@@ -230,10 +243,10 @@ void main() {
       });
 
       test('sudah check-in & out: sets buttonState=done', () async {
-        when(() => mockDio.get('/attendance/today'))
-            .thenAnswer((_) async => _fakeResponse(data: _todayDone));
+        when(() => mockDio.get('/courses/5/today'))
+            .thenAnswer((_) async => _fakeResponse(data: _wrapToday(_todayDone)));
 
-        await provider.loadToday();
+        await provider.loadToday(5);
 
         expect(provider.hasCheckIn, isTrue);
         expect(provider.hasCheckOut, isTrue);
@@ -243,9 +256,9 @@ void main() {
       });
 
       test('DioException: sets error, clears loading', () async {
-        when(() => mockDio.get('/attendance/today')).thenThrow(
+        when(() => mockDio.get('/courses/5/today')).thenThrow(
           DioException(
-            requestOptions: RequestOptions(path: '/attendance/today'),
+            requestOptions: RequestOptions(path: '/courses/5/today'),
             response: _fakeResponse(
               data: {'message': 'Unauthenticated.'},
               statusCode: 401,
@@ -254,7 +267,7 @@ void main() {
           ),
         );
 
-        await provider.loadToday();
+        await provider.loadToday(5);
 
         expect(provider.error, isNotNull);
         expect(provider.isLoading, isFalse);
@@ -262,12 +275,12 @@ void main() {
 
       test('sets isLoading=true during request then false after', () async {
         var loadingDuringCall = false;
-        when(() => mockDio.get('/attendance/today')).thenAnswer((_) async {
+        when(() => mockDio.get('/courses/5/today')).thenAnswer((_) async {
           loadingDuringCall = provider.isLoading;
-          return _fakeResponse(data: _todayCanCheckIn);
+          return _fakeResponse(data: _wrapToday(_todayCanCheckIn));
         });
 
-        await provider.loadToday();
+        await provider.loadToday(5);
 
         expect(loadingDuringCall, isTrue);
         expect(provider.isLoading, isFalse);
@@ -281,23 +294,23 @@ void main() {
     group('checkIn', () {
       setUp(() {
         // After checkIn, the provider calls loadToday internally.
-        when(() => mockDio.get('/attendance/today'))
-            .thenAnswer((_) async => _fakeResponse(data: _todayCanCheckOut));
+        when(() => mockDio.get('/courses/5/today'))
+            .thenAnswer((_) async => _fakeResponse(data: _wrapToday(_todayCanCheckOut)));
       });
 
-      test('posts to /attendance/check-in with lat, lng, address', () async {
+      test('posts to /courses/5/check-in with lat, lng, address', () async {
         when(
           () => mockDio.post(
-            '/attendance/check-in',
+            '/courses/5/check-in',
             data: any(named: 'data'),
           ),
         ).thenAnswer((_) async => _fakeResponse(data: _punchResponse()));
 
-        await provider.checkIn(lat: -6.2, lng: 106.816666, address: 'Jl. Raya');
+        await provider.checkIn(courseId: 5, lat: -6.2, lng: 106.816666, address: 'Jl. Raya');
 
         final captured = verify(
           () => mockDio.post(
-            '/attendance/check-in',
+            '/courses/5/check-in',
             data: captureAny(named: 'data'),
           ),
         ).captured;
@@ -311,12 +324,12 @@ void main() {
       test('returns AttendanceModel on success', () async {
         when(
           () => mockDio.post(
-            '/attendance/check-in',
+            '/courses/5/check-in',
             data: any(named: 'data'),
           ),
         ).thenAnswer((_) async => _fakeResponse(data: _punchResponse()));
 
-        final model = await provider.checkIn(lat: -6.2, lng: 106.816666);
+        final model = await provider.checkIn(courseId: 5, lat: -6.2, lng: 106.816666);
 
         expect(model, isNotNull);
         expect(model.checkInAt, isNotNull);
@@ -325,16 +338,16 @@ void main() {
       test('includes null address in body', () async {
         when(
           () => mockDio.post(
-            '/attendance/check-in',
+            '/courses/5/check-in',
             data: any(named: 'data'),
           ),
         ).thenAnswer((_) async => _fakeResponse(data: _punchResponse()));
 
-        await provider.checkIn(lat: -6.2, lng: 106.816666, address: null);
+        await provider.checkIn(courseId: 5, lat: -6.2, lng: 106.816666, address: null);
 
         final captured = verify(
           () => mockDio.post(
-            '/attendance/check-in',
+            '/courses/5/check-in',
             data: captureAny(named: 'data'),
           ),
         ).captured;
@@ -346,12 +359,12 @@ void main() {
       test('throws AttendanceApiException on DioException', () async {
         when(
           () => mockDio.post(
-            '/attendance/check-in',
+            '/courses/5/check-in',
             data: any(named: 'data'),
           ),
         ).thenThrow(
           DioException(
-            requestOptions: RequestOptions(path: '/attendance/check-in'),
+            requestOptions: RequestOptions(path: '/courses/5/check-in'),
             response: _fakeResponse(
               data: {'message': 'Di luar radius kampus.'},
               statusCode: 422,
@@ -361,7 +374,7 @@ void main() {
         );
 
         await expectLater(
-          () => provider.checkIn(lat: -6.2, lng: 106.816666),
+          () => provider.checkIn(courseId: 5, lat: -6.2, lng: 106.816666),
           throwsA(isA<AttendanceApiException>()),
         );
         expect(provider.error, isNotNull);
@@ -371,7 +384,7 @@ void main() {
       test('shows the server message when 422 is RETURNED (not thrown) — e.g. di luar area kampus', () async {
         when(
           () => mockDio.post(
-            '/attendance/check-in',
+            '/courses/5/check-in',
             data: any(named: 'data'),
           ),
         ).thenAnswer(
@@ -382,7 +395,7 @@ void main() {
         );
 
         await expectLater(
-          () => provider.checkIn(lat: -6.2, lng: 106.816666),
+          () => provider.checkIn(courseId: 5, lat: -6.2, lng: 106.816666),
           throwsA(
             isA<AttendanceApiException>().having(
               (e) => e.message,
@@ -402,23 +415,23 @@ void main() {
 
     group('checkOut', () {
       setUp(() {
-        when(() => mockDio.get('/attendance/today'))
-            .thenAnswer((_) async => _fakeResponse(data: _todayDone));
+        when(() => mockDio.get('/courses/5/today'))
+            .thenAnswer((_) async => _fakeResponse(data: _wrapToday(_todayDone)));
       });
 
-      test('posts to /attendance/check-out with lat, lng, address', () async {
+      test('posts to /courses/5/check-out with lat, lng, address', () async {
         when(
           () => mockDio.post(
-            '/attendance/check-out',
+            '/courses/5/check-out',
             data: any(named: 'data'),
           ),
         ).thenAnswer((_) async => _fakeResponse(data: _punchResponse(withCheckOut: true)));
 
-        await provider.checkOut(lat: -6.2, lng: 106.816666, address: 'Kantor');
+        await provider.checkOut(courseId: 5, lat: -6.2, lng: 106.816666, address: 'Kantor');
 
         final captured = verify(
           () => mockDio.post(
-            '/attendance/check-out',
+            '/courses/5/check-out',
             data: captureAny(named: 'data'),
           ),
         ).captured;
@@ -432,12 +445,12 @@ void main() {
       test('returns AttendanceModel with checkOutAt on success', () async {
         when(
           () => mockDio.post(
-            '/attendance/check-out',
+            '/courses/5/check-out',
             data: any(named: 'data'),
           ),
         ).thenAnswer((_) async => _fakeResponse(data: _punchResponse(withCheckOut: true)));
 
-        final model = await provider.checkOut(lat: -6.2, lng: 106.816666);
+        final model = await provider.checkOut(courseId: 5, lat: -6.2, lng: 106.816666);
 
         expect(model.checkOutAt, isNotNull);
       });
@@ -445,12 +458,12 @@ void main() {
       test('throws AttendanceApiException on DioException', () async {
         when(
           () => mockDio.post(
-            '/attendance/check-out',
+            '/courses/5/check-out',
             data: any(named: 'data'),
           ),
         ).thenThrow(
           DioException(
-            requestOptions: RequestOptions(path: '/attendance/check-out'),
+            requestOptions: RequestOptions(path: '/courses/5/check-out'),
             response: _fakeResponse(
               data: {'message': 'Belum check-in.'},
               statusCode: 422,
@@ -460,7 +473,7 @@ void main() {
         );
 
         await expectLater(
-          () => provider.checkOut(lat: -6.2, lng: 106.816666),
+          () => provider.checkOut(courseId: 5, lat: -6.2, lng: 106.816666),
           throwsA(isA<AttendanceApiException>()),
         );
       });
@@ -471,7 +484,7 @@ void main() {
         // casting the (absent) `attendance` field.
         when(
           () => mockDio.post(
-            '/attendance/check-out',
+            '/courses/5/check-out',
             data: any(named: 'data'),
           ),
         ).thenAnswer(
@@ -482,7 +495,7 @@ void main() {
         );
 
         await expectLater(
-          () => provider.checkOut(lat: -6.2, lng: 106.816666),
+          () => provider.checkOut(courseId: 5, lat: -6.2, lng: 106.816666),
           throwsA(
             isA<AttendanceApiException>().having(
               (e) => e.message,
@@ -569,6 +582,27 @@ void main() {
         expect(provider.error, isNotNull);
         expect(provider.history, isEmpty);
         expect(provider.isLoading, isFalse);
+      });
+
+      test('passes course_id when courseId provided', () async {
+        when(
+          () => mockDio.get(
+            '/attendance/history',
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer((_) async => _fakeResponse(data: _historyResponse));
+
+        await provider.loadHistory('2026-06', courseId: 3);
+
+        final captured = verify(
+          () => mockDio.get(
+            '/attendance/history',
+            queryParameters: captureAny(named: 'queryParameters'),
+          ),
+        ).captured;
+        final params = captured.first as Map<String, dynamic>;
+        expect(params['month'], '2026-06');
+        expect(params['course_id'], 3);
       });
     });
   });
