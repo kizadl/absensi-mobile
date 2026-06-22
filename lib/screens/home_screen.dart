@@ -241,10 +241,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 AttendanceButtonState.canCheckIn
                             ? attendance.canCheckIn
                             : attendance.canCheckOut,
-                        windowStartTime: attendance.buttonState ==
-                                AttendanceButtonState.canCheckIn
-                            ? auth.location?.checkInStart
-                            : auth.location?.checkOutStart,
+                        // TODO(Task 5): use course jam instead of SettingModel jam (jam now per-course)
+                        windowStartTime: null,
                       ),
                     ],
                   ),

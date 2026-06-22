@@ -50,9 +50,6 @@ const Map<String, dynamic> _locationJson = {
   'campus_lat': -6.200000,
   'campus_lng': 106.816666,
   'radius_meters': 200,
-  'check_in_start': '07:00',
-  'late_after': '08:00',
-  'check_out_start': '16:00',
   'timezone': 'Asia/Jakarta',
 };
 
@@ -286,7 +283,6 @@ void main() {
       expect(auth.location?.campusLat, closeTo(-6.2, 0.0001));
       expect(auth.location?.campusLng, closeTo(106.816666, 0.0001));
       expect(auth.location?.radiusMeters, equals(200));
-      expect(auth.location?.checkInStart, equals('07:00'));
       expect(auth.location?.timezone, equals('Asia/Jakarta'));
     });
   });

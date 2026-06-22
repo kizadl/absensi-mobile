@@ -98,9 +98,6 @@ void main() {
     campusLat: -6.2,
     campusLng: 106.8,
     radiusMeters: 100,
-    checkInStart: '07:00',
-    lateAfter: '08:00',
-    checkOutStart: '15:00',
     timezone: 'Asia/Jakarta',
   );
 
@@ -140,7 +137,7 @@ void main() {
   });
 
   testWidgets(
-      'canCheckIn + canCheckIn==false → "Masuk mulai 07:00" dan disabled',
+      'canCheckIn + canCheckIn==false → "Belum waktunya masuk" dan disabled (jam from course in Task 5)',
       (tester) async {
     await tester.pumpWidget(_wrap(
       auth: FakeAuthProvider(user: user, location: setting),
@@ -152,13 +149,13 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('Masuk mulai 07:00'), findsOneWidget);
+    expect(find.text('Belum waktunya masuk'), findsOneWidget);
     final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
     expect(btn.onPressed, isNull); // disabled
   });
 
   testWidgets(
-      'canCheckOut + canCheckOut==false → "Pulang mulai 15:00" dan disabled',
+      'canCheckOut + canCheckOut==false → "Belum waktunya pulang" dan disabled (jam from course in Task 5)',
       (tester) async {
     await tester.pumpWidget(_wrap(
       auth: FakeAuthProvider(user: user, location: setting),
@@ -170,7 +167,7 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('Pulang mulai 15:00'), findsOneWidget);
+    expect(find.text('Belum waktunya pulang'), findsOneWidget);
     final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
     expect(btn.onPressed, isNull); // disabled
   });
