@@ -1,12 +1,15 @@
 /// Application-wide environment configuration.
 ///
-/// Dev setup reaches the Laravel API on the host PC via USB:
-///   adb reverse tcp:8000 tcp:8000
-/// which maps the device's localhost:8000 to the PC's localhost:8000.
-/// (For the Android emulator without adb reverse, use http://10.0.2.2:8000/api.)
+/// Production (default): aplikasi terhubung ke backend yang di-hosting.
+///   https://e-presensi.dzakinetic.site/api
+///
+/// Untuk development lokal, ganti `baseUrl` sesuai cara perangkat terhubung:
+///   - Emulator Android        : http://10.0.2.2:8000/api
+///   - HP fisik via USB        : http://127.0.0.1:8000/api  (jalankan: adb reverse tcp:8000 tcp:8000)
+///   - HP fisik se-WiFi dgn PC : http://<IP-LAN-PC>:8000/api (server: php artisan serve --host=0.0.0.0)
 class Env {
   Env._();
 
   /// Base URL for the Laravel API (Sanctum). Includes the `/api` prefix.
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  static const String baseUrl = 'https://e-presensi.dzakinetic.site/api';
 }
