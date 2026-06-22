@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/course_model.dart';
 import '../providers/attendance_provider.dart';
 import '../providers/course_provider.dart';
+import '../services/api_client.dart';
 import 'course_presensi_screen.dart';
 
 /// Tombol pintar terisolasi — label & enable bergantung pada [state],
@@ -121,7 +122,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openCourse(CourseModel course) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => CoursePresensiScreen(course: course),
+        builder: (_) => ChangeNotifierProvider(
+          create: (ctx) => AttendanceProvider(ctx.read<ApiClient>()),
+          child: CoursePresensiScreen(course: course),
+        ),
       ),
     );
   }
